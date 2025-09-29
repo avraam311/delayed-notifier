@@ -3,9 +3,11 @@ package worker
 import (
 	"fmt"
 	"sync"
+	"time"
 
 	"github.com/avraam311/delayed-notifier/internal/rabbitmq"
 
+	"github.com/wb-go/wbf/retry"
 	"github.com/wb-go/wbf/zlog"
 )
 
@@ -44,14 +46,22 @@ func (w *Worker) Run() {
 		}
 	}()
 
+	retryStrategy := retry.Strategy{
+		Attempts: 3,
+		Delay:    time.Minute,
+		Backoff:  3,
+	}
+
 	wg.Add(w.WorkersCount)
 	for i := 0; i < w.WorkersCount; i++ {
 		go func() {
 			defer wg.Done()
 			for msg := range readerCh {
-				err := w.handlerMessage(msg)
+				err := retry.Do(func() error {
+					return w.handlerMessage(msg)
+				}, retryStrategy)
 				if err != nil {
-					zlog.Logger.Warn().Err(err).Msg("worker/workeg.go - failed to handle message fully")
+					zlog.Logger.Warn().Err(err).Msg("worker/workeg.go - failed to handle message perfectly")
 				}
 			}
 		}()

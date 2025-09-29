@@ -24,28 +24,45 @@ func New() (*RabbitMq, error) {
 		return nil, fmt.Errorf("rabbitmq/rabbitmq.go - failed to open channel - %w", err)
 	}
 
-	e := rabbitmq.NewExchange(
+	mainExchange := rabbitmq.NewExchange(
 		"notifications-exchange",
 		"x-delayed-message",
 	)
 	args := amqp.Table{
 		"x-delayed-type": "direct",
 	}
-	e.Args = args
-	e.Durable = true
-	err = e.BindToChannel(rabbitMqChan)
+	mainExchange.Args = args
+	mainExchange.Durable = true
+
+	err = mainExchange.BindToChannel(rabbitMqChan)
 	if err != nil {
 		return nil, fmt.Errorf("rabbitmq/rabbitmq.go - failed to declare exchange - %w", err)
 	}
 
-	qm := rabbitmq.NewQueueManager(rabbitMqChan)
+	retryExchange := rabbitmq.NewExchange(
+		"retry-notifications-exchange",
+		"direct",
+	)
+	retryExchange.Durable = true
+
+	args = amqp.Table{
+		"x-dead-letter-exchange": "retry-notifications-exchange",
+	}
+
+	err = retryExchange.BindToChannel(rabbitMqChan)
+	if err != nil {
+		return nil, fmt.Errorf("rabbitmq/rabbitmq.go - failed to declare retry exchange - %w", err)
+	}
+
+	mainQueueManager := rabbitmq.NewQueueManager(rabbitMqChan)
 	queueCfg := rabbitmq.QueueConfig{
 		Durable:    true,
 		AutoDelete: false,
 		Exclusive:  false,
 		NoWait:     false,
+		Args:       args,
 	}
-	queue, err := qm.DeclareQueue(
+	mainQueue, err := mainQueueManager.DeclareQueue(
 		"notifications-queue",
 		queueCfg,
 	)
@@ -54,9 +71,41 @@ func New() (*RabbitMq, error) {
 	}
 
 	err = rabbitMqChan.QueueBind(
-		queue.Name,
+		mainQueue.Name,
 		"notifications-key",
 		"notifications-exchange",
+		false,
+		nil,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("rabbitmq/rabbitmq.go - failed to bind - %w", err)
+	}
+
+	retryArgs := amqp.Table{
+		"x-message-ttl":          int32(60000),
+		"x-dead-letter-exchange": "notifications-exchange",
+	}
+
+	retryQueueManager := rabbitmq.NewQueueManager(rabbitMqChan)
+	retryQueueCfg := rabbitmq.QueueConfig{
+		Durable:    true,
+		AutoDelete: false,
+		Exclusive:  false,
+		NoWait:     false,
+		Args:       retryArgs,
+	}
+	retryQueue, err := retryQueueManager.DeclareQueue(
+		"retry-notifications-queue",
+		retryQueueCfg,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("rabbitmq/rabbitmq.go - failed to declare retry queue - %w", err)
+	}
+
+	err = rabbitMqChan.QueueBind(
+		retryQueue.Name,
+		"notifications-key",
+		"retry-notifications-exchange",
 		false,
 		nil,
 	)

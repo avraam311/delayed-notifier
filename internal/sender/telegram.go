@@ -27,8 +27,9 @@ func (tb *TelegramBot) SendMessage(msg []byte) error {
 	json.Unmarshal(msg, &not)
 
 	chatID := int64(not.UserID)
+	text := not.Message
 
-	msgToSend := tg.NewMessage(chatID, "Привет! Это тестовое сообщение из Go.")
+	msgToSend := tg.NewMessage(chatID, text)
 
 	_, err := tb.bot.Send(msgToSend)
 	if err != nil {
