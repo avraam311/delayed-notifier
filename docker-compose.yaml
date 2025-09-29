@@ -1,6 +1,18 @@
 services:
+  worker:
+    build:
+      context: .
+      dockerfile: ./cmd/app/Dockerfile
+    container_name: worker
+    ports:
+      - "8080"
+    depends_on:
+      - rabbitmq
+    networks:
+      - app-network
+
   rabbitmq:
-    image: rabbitmq:4-management
+    image: heidiks/rabbitmq-delayed-message-exchange:3.11.28-management
     container_name: rabbitmq
     restart: always
     ports:
