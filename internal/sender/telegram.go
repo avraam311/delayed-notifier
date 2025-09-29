@@ -12,7 +12,7 @@ type TelegramBot struct {
 	bot *tg.BotAPI
 }
 
-func New(botToken string) (*TelegramBot, error) {
+func NewBot(botToken string) (*TelegramBot, error) {
 	bot, err := tg.NewBotAPI(botToken)
 	if err != nil {
 		return nil, err

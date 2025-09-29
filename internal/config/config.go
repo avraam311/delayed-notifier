@@ -12,7 +12,9 @@ type Config struct {
 }
 
 type Env struct {
-	BotToken string
+	BotToken     string
+	MailLogin    string
+	MailPassword string
 }
 
 func MustLoad() (*Config, error) {
@@ -23,6 +25,8 @@ func MustLoad() (*Config, error) {
 	}
 	env := &Env{}
 	env.BotToken = os.Getenv("botToken")
+	env.MailLogin = os.Getenv("mailLogin")
+	env.MailPassword = os.Getenv("mailPassword")
 	return &Config{
 		Env: env,
 		Cfg: cfg,

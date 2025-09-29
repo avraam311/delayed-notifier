@@ -1,6 +1,7 @@
 package worker
 
 import (
+	"fmt"
 	"sync"
 
 	"github.com/avraam311/delayed-notifier/internal/rabbitmq"
@@ -8,21 +9,27 @@ import (
 	"github.com/wb-go/wbf/zlog"
 )
 
-type tgBot interface {
+type tgBotI interface {
+	SendMessage(msg []byte) error
+}
+
+type mailI interface {
 	SendMessage(msg []byte) error
 }
 
 type Worker struct {
 	RMQ          *rabbitmq.RabbitMq
 	WorkersCount int
-	TgBot        tgBot
+	TgBot        tgBotI
+	Mail         mailI
 }
 
-func New(rMQ *rabbitmq.RabbitMq, workersCount int, tgBot tgBot) *Worker {
+func New(rMQ *rabbitmq.RabbitMq, workersCount int, tgBot tgBotI, mail mailI) *Worker {
 	return &Worker{
 		RMQ:          rMQ,
 		WorkersCount: workersCount,
 		TgBot:        tgBot,
+		Mail:         mail,
 	}
 }
 
@@ -44,7 +51,7 @@ func (w *Worker) Run() {
 			for msg := range readerCh {
 				err := w.handlerMessage(msg)
 				if err != nil {
-					zlog.Logger.Warn().Err(err).Msg("worker/workeg.go - failed to handle message")
+					zlog.Logger.Warn().Err(err).Msg("worker/workeg.go - failed to handle message fully")
 				}
 			}
 		}()
@@ -54,9 +61,17 @@ func (w *Worker) Run() {
 }
 
 func (w *Worker) handlerMessage(msg []byte) error {
-	err := w.TgBot.SendMessage(msg)
-	if err != nil {
-		return err
+	tgErr := w.TgBot.SendMessage(msg)
+
+	mailErr := w.Mail.SendMessage(msg)
+
+	if tgErr != nil && mailErr != nil {
+		return fmt.Errorf("failed to send notification to both tg and mail")
+	} else if tgErr != nil {
+		return fmt.Errorf("failed to send notification to tg")
+	} else if mailErr != nil {
+		return fmt.Errorf("failed to send notification to mail")
 	}
+
 	return nil
 }

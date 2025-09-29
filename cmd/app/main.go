@@ -29,7 +29,8 @@ func main() {
 	}
 
 	not := models.Notification{
-		UserID:  6176317973,
+		UserID:  617,
+		ToMail:  []string{"example@mail.ru"},
 		Message: "hi",
 	}
 	msg, err := json.Marshal(not)
@@ -41,12 +42,13 @@ func main() {
 	RMQ.Publish("notifications-key", msg, "application/json", time.Second*20)
 	RMQ.Publish("notifications-key", msg, "application/json", time.Second*40)
 
-	tgBot, err := sender.New(cfg.Env.BotToken)
+	tgBot, err := sender.NewBot(cfg.Env.BotToken)
 	if err != nil {
 		zlog.Logger.Panic().Err(err).Msg("failed to init tgBot")
 	}
+	Mail := sender.NewMail("smtp.mail.ru", "587", cfg.Env.MailLogin, cfg.Env.MailPassword)
 
-	work := worker.New(RMQ, workersCount, tgBot)
+	work := worker.New(RMQ, workersCount, tgBot, Mail)
 	zlog.Logger.Info().Msg("worker is running")
 	work.Run()
 }
