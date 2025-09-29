@@ -8,6 +8,8 @@ services:
       - "8080"
     depends_on:
       - rabbitmq
+    env_file:
+      - .env
     networks:
       - app-network
 

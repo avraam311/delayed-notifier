@@ -13,5 +13,6 @@ RUN go build -o worker ./cmd/app/main.go
 FROM alpine AS runner
 
 COPY --from=build_base /app/worker .
+COPY config ./config
 
 CMD ["./worker"]

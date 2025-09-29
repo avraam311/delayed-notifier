@@ -1,22 +1,28 @@
 package worker
 
 import (
-	"fmt"
 	"sync"
 
 	"github.com/avraam311/delayed-notifier/internal/rabbitmq"
+
 	"github.com/wb-go/wbf/zlog"
 )
+
+type tgBot interface {
+	SendMessage(msg []byte) error
+}
 
 type Worker struct {
 	RMQ          *rabbitmq.RabbitMq
 	WorkersCount int
+	TgBot        tgBot
 }
 
-func New(RMQ *rabbitmq.RabbitMq, WorkersCount int) *Worker {
+func New(rMQ *rabbitmq.RabbitMq, workersCount int, tgBot tgBot) *Worker {
 	return &Worker{
-		RMQ:          RMQ,
-		WorkersCount: WorkersCount,
+		RMQ:          rMQ,
+		WorkersCount: workersCount,
+		TgBot:        tgBot,
 	}
 }
 
@@ -48,7 +54,7 @@ func (w *Worker) Run() {
 }
 
 func (w *Worker) handlerMessage(msg []byte) error {
-	_, err := fmt.Println(msg)
+	err := w.TgBot.SendMessage(msg)
 	if err != nil {
 		return err
 	}
