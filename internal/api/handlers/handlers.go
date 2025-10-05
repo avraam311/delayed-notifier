@@ -3,10 +3,12 @@ package handlers
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"strconv"
 
 	"github.com/avraam311/delayed-notifier/internal/models/domain"
+	"github.com/avraam311/delayed-notifier/internal/repository/notifications"
 
 	"github.com/go-playground/validator/v10"
 	"github.com/wb-go/wbf/ginext"
@@ -73,6 +75,12 @@ func (h *HandlerNotification) GetNotificationStatus(c *ginext.Context) {
 
 	status, err := h.service.GetNotificationStatus(c.Request.Context(), id)
 	if err != nil {
+		if errors.Is(err, notifications.ErrNotificationNotFound) {
+			zlog.Logger.Warn().Err(err).Msg("notification not found")
+			Fail(c.Writer, http.StatusNotFound, "notification not found")
+			return
+		}
+
 		zlog.Logger.Warn().Err(err).Msg("failed to get notification status")
 		Fail(c.Writer, http.StatusInternalServerError, "internal error")
 		return
@@ -97,6 +105,12 @@ func (h *HandlerNotification) DeleteNotification(c *ginext.Context) {
 	}
 
 	if err := h.service.DeleteNotification(c.Request.Context(), id); err != nil {
+		if errors.Is(err, notifications.ErrNotificationNotFound) {
+			zlog.Logger.Warn().Err(err).Msg("notification not found")
+			Fail(c.Writer, http.StatusNotFound, "notification not found")
+			return
+		}
+
 		zlog.Logger.Warn().Err(err).Msg("failed to delete notification")
 		Fail(c.Writer, http.StatusInternalServerError, "internal error")
 		return

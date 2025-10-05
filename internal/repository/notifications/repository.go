@@ -2,11 +2,17 @@ package notifications
 
 import (
 	"context"
+	"database/sql"
+	"errors"
 	"fmt"
 
 	"github.com/avraam311/delayed-notifier/internal/models/domain"
 
 	"github.com/wb-go/wbf/dbpg"
+)
+
+var (
+	ErrNotificationNotFound = errors.New("notification not found")
 )
 
 type repositoryNotification struct {
@@ -50,6 +56,10 @@ func (r *repositoryNotification) GetNotificationStatus(ctx context.Context, id i
 		ctx, query, id,
 	).Scan(&status)
 	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return "", ErrNotificationNotFound
+		}
+
 		return "", fmt.Errorf("notifications/repository.go - %w", err)
 	}
 
@@ -63,11 +73,16 @@ func (r *repositoryNotification) DeleteNotification(ctx context.Context, id int)
 		WHERE id = $1
 	`
 
-	_, err := r.db.ExecContext(
+	res, err := r.db.ExecContext(
 		ctx, query, id,
 	)
 	if err != nil {
 		return fmt.Errorf("notifications/repository.go - %w", err)
+	}
+
+	affectedRows, _ := res.RowsAffected()
+	if affectedRows == 0 {
+		return ErrNotificationNotFound
 	}
 
 	return nil
