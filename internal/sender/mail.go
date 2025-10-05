@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"net/smtp"
 
-	"github.com/avraam311/delayed-notifier/internal/models"
+	"github.com/avraam311/delayed-notifier/internal/models/domain"
 )
 
 type Mail struct {
@@ -27,9 +27,9 @@ func NewMail(host, port, from, password string) *Mail {
 }
 
 func (m *Mail) SendMessage(msg []byte) error {
-	not := &models.Notification{}
+	not := &domain.Notification{}
 	json.Unmarshal(msg, not)
-	to := not.ToMail
+	to := []string{not.Mail}
 	msgToSend := []byte("Subject: Hello from Go\r\n" +
 		"\r\n" +
 		not.Message + "\r\n")

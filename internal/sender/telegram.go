@@ -3,7 +3,7 @@ package sender
 import (
 	"encoding/json"
 
-	"github.com/avraam311/delayed-notifier/internal/models"
+	"github.com/avraam311/delayed-notifier/internal/models/domain"
 
 	tg "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
@@ -23,10 +23,10 @@ func NewBot(botToken string) (*TelegramBot, error) {
 }
 
 func (tb *TelegramBot) SendMessage(msg []byte) error {
-	var not *models.Notification
+	var not *domain.Notification
 	json.Unmarshal(msg, &not)
 
-	chatID := int64(not.UserID)
+	chatID := int64(not.TgID)
 	text := not.Message
 
 	msgToSend := tg.NewMessage(chatID, text)

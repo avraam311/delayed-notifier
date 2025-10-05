@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"github.com/avraam311/delayed-notifier/internal/config"
-	"github.com/avraam311/delayed-notifier/internal/models"
+	"github.com/avraam311/delayed-notifier/internal/models/domain"
 	"github.com/avraam311/delayed-notifier/internal/rabbitmq"
 	"github.com/avraam311/delayed-notifier/internal/sender"
 	"github.com/avraam311/delayed-notifier/internal/worker"
@@ -28,10 +28,12 @@ func main() {
 		zlog.Logger.Panic().Err(err).Msg("failed to init rabbitMq")
 	}
 
-	not := models.Notification{
-		UserID:  617,
-		ToMail:  []string{"example@mail.ru"},
-		Message: "hi",
+	dateTime, err := time.Parse(time.DateTime, "2025-10-3 18:30:00")
+	not := domain.Notification{
+		Message:  "hi",
+		DateTime: dateTime,
+		Mail:     "example@mail.ru",
+		TgID:     617,
 	}
 	msg, err := json.Marshal(not)
 	if err != nil {

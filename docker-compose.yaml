@@ -5,7 +5,7 @@ services:
       dockerfile: ./cmd/app/Dockerfile
     container_name: worker
     ports:
-      - "8080"
+      - "3001"
     depends_on:
       - rabbitmq
     env_file:
