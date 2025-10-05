@@ -19,19 +19,19 @@ type notificationService interface {
 	DeleteNotification(context.Context, int) error
 }
 
-type HandlerNotifications struct {
+type HandlerNotification struct {
 	service   notificationService
 	validator *validator.Validate
 }
 
-func NewHandler(s notificationService, v *validator.Validate) *HandlerNotifications {
-	return &HandlerNotifications{
+func NewHandler(s notificationService, v *validator.Validate) *HandlerNotification {
+	return &HandlerNotification{
 		service:   s,
 		validator: v,
 	}
 }
 
-func (h *HandlerNotifications) CreateNotification(c *ginext.Context) {
+func (h *HandlerNotification) CreateNotification(c *ginext.Context) {
 	var not *domain.Notification
 
 	if err := json.NewDecoder(c.Request.Body).Decode(&not); err != nil {
@@ -56,7 +56,7 @@ func (h *HandlerNotifications) CreateNotification(c *ginext.Context) {
 	Created(c.Writer, id)
 }
 
-func (h *HandlerNotifications) GetNotificationStatus(c *ginext.Context) {
+func (h *HandlerNotification) GetNotificationStatus(c *ginext.Context) {
 	idStr := c.Param("id")
 	id, err := strconv.Atoi(idStr)
 	if err != nil {
@@ -81,7 +81,7 @@ func (h *HandlerNotifications) GetNotificationStatus(c *ginext.Context) {
 	OK(c.Writer, status)
 }
 
-func (h *HandlerNotifications) DeleteNotification(c *ginext.Context) {
+func (h *HandlerNotification) DeleteNotification(c *ginext.Context) {
 	idStr := c.Param("id")
 	id, err := strconv.Atoi(idStr)
 	if err != nil {
