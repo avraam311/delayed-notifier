@@ -11,6 +11,7 @@ import (
 type RabbitMq struct {
 	publisher *rabbitmq.Publisher
 	consumer  *rabbitmq.Consumer
+	ch        *amqp.Channel
 }
 
 func New() (*RabbitMq, error) {
@@ -121,6 +122,7 @@ func New() (*RabbitMq, error) {
 	return &RabbitMq{
 		publisher: publisher,
 		consumer:  consumer,
+		ch:        rabbitMqChan,
 	}, nil
 }
 
@@ -143,6 +145,13 @@ func (r *RabbitMq) Consume(msgChan chan []byte) error {
 	err := r.consumer.Consume(msgChan)
 	if err != nil {
 		return fmt.Errorf("rabbitmq/consumer.go - failed to consume message - %w", err)
+	}
+	return nil
+}
+
+func (r *RabbitMq) Close() error {
+	if err := r.ch.Close(); err != nil {
+		return err
 	}
 	return nil
 }

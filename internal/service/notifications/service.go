@@ -1,4 +1,4 @@
-package notification
+package notifications
 
 import (
 	"context"
@@ -16,7 +16,7 @@ type repositoryNotification interface {
 }
 
 type rabbitMQ interface {
-	Publish(string, []byte, string, time.Time) error
+	Publish(string, []byte, string, time.Duration) error
 }
 
 type ServiceNotification struct {
@@ -24,9 +24,10 @@ type ServiceNotification struct {
 	rabbitMQ rabbitMQ
 }
 
-func NewService(repo repositoryNotification) *ServiceNotification {
+func NewService(repo repositoryNotification, rMQ rabbitMQ) *ServiceNotification {
 	return &ServiceNotification{
-		repo: repo,
+		repo:     repo,
+		rabbitMQ: rMQ,
 	}
 }
 
@@ -36,7 +37,7 @@ func (s *ServiceNotification) CreateNotification(ctx context.Context, not *domai
 		return 0, err
 	}
 
-	delay := not.DateTime
+	delay := time.Until(not.DateTime)
 	msg, err := json.Marshal(not)
 	if err != nil {
 		return 0, fmt.Errorf("notification/service.go - %w", err)

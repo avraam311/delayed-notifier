@@ -19,7 +19,7 @@ type repositoryNotification struct {
 	db *dbpg.DB
 }
 
-func NewRepositoryNotification(db *dbpg.DB) *repositoryNotification {
+func NewRepository(db *dbpg.DB) *repositoryNotification {
 	return &repositoryNotification{
 		db: db,
 	}

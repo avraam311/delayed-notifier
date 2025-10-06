@@ -1,56 +1,89 @@
 package main
 
 import (
-	"encoding/json"
+	"context"
+	"os/signal"
+	"syscall"
 	"time"
 
+	"github.com/avraam311/delayed-notifier/internal/api/handlers"
+	"github.com/avraam311/delayed-notifier/internal/api/server"
 	"github.com/avraam311/delayed-notifier/internal/config"
-	"github.com/avraam311/delayed-notifier/internal/models/domain"
 	"github.com/avraam311/delayed-notifier/internal/rabbitmq"
-	"github.com/avraam311/delayed-notifier/internal/sender"
-	"github.com/avraam311/delayed-notifier/internal/worker"
+	notRepo "github.com/avraam311/delayed-notifier/internal/repository/notifications"
+	notService "github.com/avraam311/delayed-notifier/internal/service/notifications"
 
+	"github.com/wb-go/wbf/dbpg"
 	"github.com/wb-go/wbf/zlog"
-)
 
-const (
-	workersCount = 5
+	"github.com/go-playground/validator/v10"
 )
 
 func main() {
+	ctx, shutdown := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer shutdown()
+
 	zlog.Init()
 	cfg, err := config.MustLoad()
 	if err != nil {
-		zlog.Logger.Panic().Err(err).Msg("failed to init config")
+		zlog.Logger.Panic().Err(err).Msg("failed to initialize config")
 	}
-	RMQ, err := rabbitmq.New()
+
+	val := validator.New()
+	rMQ, err := rabbitmq.New()
 	if err != nil {
-		zlog.Logger.Panic().Err(err).Msg("failed to init rabbitMq")
+		zlog.Logger.Panic().Err(err).Msg("failed to initialize rabbitMQ")
 	}
 
-	dateTime, err := time.Parse(time.DateTime, "2025-10-3 18:30:00")
-	not := domain.Notification{
-		Message:  "hi",
-		DateTime: dateTime,
-		Mail:     "example@mail.ru",
-		TgID:     617,
+	opts := &dbpg.Options{
+		MaxOpenConns:    cfg.Cfg.GetInt("max_open_conns"),
+		MaxIdleConns:    cfg.Cfg.GetInt("max_idle_conns"),
+		ConnMaxLifetime: time.Duration(cfg.Cfg.GetInt("conn_max_lifetime")),
 	}
-	msg, err := json.Marshal(not)
+
+	slaveDNSs := make([]string, 0, len(cfg.Cfg.GetString("slaves")))
+
+	for _, s := range cfg.Cfg.GetSlice("slaves") {
+		slaveDNSs = append(slaveDNSs, s.DSN())
+	}
+
+	db, err := dbpg.New(cfg.Cfg.GetString("master"), slaveDNSs, opts)
 	if err != nil {
-		zlog.Logger.Warn().Err(err).Msg("failed to marshal into json")
+		zlog.Logger.Panic().Err(err).Msg("failed to initialize db")
 	}
 
-	RMQ.Publish("notifications-key", msg, "application/json", time.Second*1)
-	RMQ.Publish("notifications-key", msg, "application/json", time.Second*20)
-	RMQ.Publish("notifications-key", msg, "application/json", time.Second*40)
+	repo := notRepo.NewRepository(db)
+	s := notService.NewService(repo, rMQ)
+	notHandler := handlers.NewHandler(s, val)
 
-	tgBot, err := sender.NewBot(cfg.Env.BotToken)
-	if err != nil {
-		zlog.Logger.Panic().Err(err).Msg("failed to init tgBot")
+	r := server.NewRouter(notHandler)
+	srv := server.NewServer(cfg.Cfg.GetString("port"), r)
+	go func() {
+		if err := srv.ListenAndServe(); err != nil {
+			zlog.Logger.Panic().Err(err).Msg("failed to run server")
+		}
+	}()
+
+	<-ctx.Done()
+	zlog.Logger.Info().Msg("graceful shutdown signal recieved")
+
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	if err := srv.Shutdown(shutdownCtx); err != nil {
+		zlog.Logger.Error().Err(err).Msg("failed to shutdown server")
 	}
-	Mail := sender.NewMail("smtp.mail.ru", "587", cfg.Env.MailLogin, cfg.Env.MailPassword)
 
-	work := worker.New(RMQ, workersCount, tgBot, Mail)
-	zlog.Logger.Info().Msg("worker is running")
-	work.Run()
+	if err := db.Master.Close(); err != nil {
+		zlog.Logger.Error().Err(err).Msg("failed to close master db")
+	}
+	for i, s := range db.Slaves {
+		if err := s.Close(); err != nil {
+			zlog.Logger.Error().Err(err).Int("slave number", i).Msg("failed to close slave db")
+		}
+	}
+
+	if err := rMQ.Close(); err != nil {
+		zlog.Logger.Error().Err(err).Msg("failed to close RabbitMQ channel")
+	}
 }
