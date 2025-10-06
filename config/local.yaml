@@ -3,11 +3,6 @@ server:
 
 database:
   master:
-    host: "db"
-    port: "5432"
-    user: "postgres"
-    pass: ""
-    name: "notifier"
     ssl_mode: "disable"
 
   slaves: []
@@ -36,19 +31,3 @@ retry:
 
 workers:
   count: 5
-
-redis:
-  address: "redis:6379"
-  password: ""
-  database: "0"
-
-email:
-  smtp_host: "smtp.mailtrap.io"
-  smtp_port: "587"
-  username: "smtp_user"
-  password: "smtp_pass"
-  from: "example@example.com"
-
-telegram:
-  token: ""
-  chat_id: ""
