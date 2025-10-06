@@ -20,8 +20,8 @@ import (
 )
 
 func main() {
-	ctx, shutdown := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
-	defer shutdown()
+	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer cancel()
 
 	zlog.Init()
 	cfg, err := config.MustLoad()
@@ -67,8 +67,8 @@ func main() {
 	<-ctx.Done()
 	zlog.Logger.Info().Msg("graceful shutdown signal recieved")
 
-	shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
+	shutdownCtx, shutdown := context.WithTimeout(context.Background(), 5*time.Second)
+	defer shutdown()
 
 	if err := srv.Shutdown(shutdownCtx); err != nil {
 		zlog.Logger.Error().Err(err).Msg("failed to shutdown server")

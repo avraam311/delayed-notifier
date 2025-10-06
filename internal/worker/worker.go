@@ -42,7 +42,7 @@ func (w *Worker) Run() {
 	go func() {
 		err := w.RMQ.Consume(readerCh)
 		if err != nil {
-			zlog.Logger.Warn().Err(err).Msg("worker/worker.go - failed to consume message")
+			zlog.Logger.Panic().Err(err).Msg("worker/worker.go - failed to start consuming messages")
 		}
 	}()
 
