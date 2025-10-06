@@ -1,18 +1,16 @@
 FROM golang:alpine AS build_base
 
-WORKDIR /app
-
-COPY go.mod go.sum ./
-
-RUN go mod download
+WORKDIR /worker
 
 COPY . .
 
-RUN go build -o worker ./cmd/app/main.go
+RUN go mod download
+
+RUN go build -o worker cmd/worker/main.go
 
 FROM alpine AS runner
 
-COPY --from=build_base /app/worker .
-COPY config ./config
+COPY --from=build_base /worker/worker .
+COPY config config
 
-CMD ["./worker"]
+CMD ["worker"]
