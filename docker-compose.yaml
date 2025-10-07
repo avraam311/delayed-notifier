@@ -49,6 +49,29 @@ services:
     networks:
       - app-network
 
+  migrator:
+    image: kukymbr/goose-docker:3.24.2
+    container_name: migrator
+    command: up
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      - GOOSE_DRIVER=${GOOSE_DRIVER}
+      - GOOSE_DBSTRING=host=${DB_HOST} port=${DB_PORT} user=${DB_USER} password=${DB_PASSWORD} dbname=${DB_NAME}
+      - GOOSE_MIGRATION_DIR=${GOOSE_MIGRATION_DIR}
+    env_file:
+      - .env
+    healthcheck:
+      test: [ "CMD", "sh", "-c", "exit 0" ]
+      interval: 5s
+      timeout: 3s
+      retries: 1
+    volumes:
+      - migrations:/migrations
+    networks:
+      - app-network
+
   rabbitmq:
     image: heidiks/rabbitmq-delayed-message-exchange:3.11.28-management
     container_name: rabbitmq
