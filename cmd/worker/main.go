@@ -23,21 +23,22 @@ func main() {
 		zlog.Logger.Panic().Err(err).Msg("failed to initialize config")
 	}
 
-	rMQ, err := rabbitmq.New()
+	rMQ, err := rabbitmq.New(cfg)
 	if err != nil {
 		zlog.Logger.Panic().Err(err).Msg("failed to initialize rabbitMQ")
 	}
 
-	tgBot, err := sender.NewBot(cfg.Env.BotToken)
+	tgBot, err := sender.NewBot(cfg.Env.TG.Token)
 	if err != nil {
 		zlog.Logger.Panic().Err(err).Msg("failed to initialize tg bot")
 	}
-	mail := sender.NewMail(cfg.Cfg.GetString("host"),
-		cfg.Cfg.GetString("port"),
-		cfg.Cfg.GetString("from"),
-		cfg.Cfg.GetString("password"))
+	mail := sender.NewMail(cfg.Env.DB.Host,
+		cfg.Env.SMTP.Port,
+		cfg.Env.SMTP.From,
+		cfg.Env.SMTP.Password,
+	)
 
-	work := worker.New(rMQ, cfg.Cfg.GetInt("workers"), tgBot, mail)
+	work := worker.New(rMQ, cfg.Cfg.GetInt("workers.count"), tgBot, mail)
 	go work.Run()
 
 	<-ctx.Done()

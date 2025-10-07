@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/avraam311/delayed-notifier/internal/config"
 	amqp "github.com/rabbitmq/amqp091-go"
 	"github.com/wb-go/wbf/rabbitmq"
 )
@@ -12,21 +13,27 @@ type RabbitMq struct {
 	publisher *rabbitmq.Publisher
 	consumer  *rabbitmq.Consumer
 	ch        *amqp.Channel
+	cfg       *config.Config
 }
 
-func New() (*RabbitMq, error) {
-	conn, err := rabbitmq.Connect("amqp://guest:guest@rabbitmq:5672/", 3, time.Second*10)
+func New(cfg *config.Config) (*RabbitMq, error) {
+	url := fmt.Sprintf("amqp://%s:%s@%s:%s/", cfg.Cfg.GetString("rabbitmq.user"),
+		cfg.Cfg.GetString("rabbitmq.password"),
+		cfg.Cfg.GetString("rabbitmq.host"),
+		cfg.Cfg.GetString("rabbitmq.port"))
+	conn, err := rabbitmq.Connect(url, cfg.Cfg.GetInt("rabbitmq.retries"), time.Second*10)
 	if err != nil {
-		return nil, fmt.Errorf("rabbitmq/rabbitmq.go - failed to connect to RabbitMq - %w", err)
+		return nil, err
 	}
 
 	rabbitMqChan, err := conn.Channel()
 	if err != nil {
-		return nil, fmt.Errorf("rabbitmq/rabbitmq.go - failed to open channel - %w", err)
+		return nil, err
 	}
 
+	notExchange := cfg.Cfg.GetString("rabbitmq.not_exchange")
 	mainExchange := rabbitmq.NewExchange(
-		"notifications-exchange",
+		notExchange,
 		"x-delayed-message",
 	)
 	args := amqp.Table{
@@ -37,22 +44,23 @@ func New() (*RabbitMq, error) {
 
 	err = mainExchange.BindToChannel(rabbitMqChan)
 	if err != nil {
-		return nil, fmt.Errorf("rabbitmq/rabbitmq.go - failed to declare exchange - %w", err)
+		return nil, err
 	}
 
+	retryNotExchange := cfg.Cfg.GetString("rabbitmq.not_exchange_retry")
 	retryExchange := rabbitmq.NewExchange(
-		"retry-notifications-exchange",
+		retryNotExchange,
 		"direct",
 	)
 	retryExchange.Durable = true
 
 	args = amqp.Table{
-		"x-dead-letter-exchange": "retry-notifications-exchange",
+		"x-dead-letter-exchange": retryNotExchange,
 	}
 
 	err = retryExchange.BindToChannel(rabbitMqChan)
 	if err != nil {
-		return nil, fmt.Errorf("rabbitmq/rabbitmq.go - failed to declare retry exchange - %w", err)
+		return nil, err
 	}
 
 	mainQueueManager := rabbitmq.NewQueueManager(rabbitMqChan)
@@ -63,28 +71,30 @@ func New() (*RabbitMq, error) {
 		NoWait:     false,
 		Args:       args,
 	}
+	notQueue := cfg.Cfg.GetString("rabbitmq.not_queue")
 	mainQueue, err := mainQueueManager.DeclareQueue(
-		"notifications-queue",
+		notQueue,
 		queueCfg,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("rabbitmq/rabbitmq.go - failed to declare queue - %w", err)
+		return nil, err
 	}
 
+	routingKey := cfg.Cfg.GetString("rabbitmq.routing_key")
 	err = rabbitMqChan.QueueBind(
 		mainQueue.Name,
-		"notifications-key",
-		"notifications-exchange",
+		routingKey,
+		notExchange,
 		false,
 		nil,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("rabbitmq/rabbitmq.go - failed to bind - %w", err)
+		return nil, err
 	}
 
 	retryArgs := amqp.Table{
-		"x-message-ttl":          int32(60000),
-		"x-dead-letter-exchange": "notifications-exchange",
+		"x-message-ttl":          int32(cfg.Cfg.GetInt("rabbitmq.ttl")),
+		"x-dead-letter-exchange": notExchange,
 	}
 
 	retryQueueManager := rabbitmq.NewQueueManager(rabbitMqChan)
@@ -95,34 +105,36 @@ func New() (*RabbitMq, error) {
 		NoWait:     false,
 		Args:       retryArgs,
 	}
+	notQueueRetry := cfg.Cfg.GetString("rabbitmq.not_queue_retry")
 	retryQueue, err := retryQueueManager.DeclareQueue(
-		"retry-notifications-queue",
+		notQueueRetry,
 		retryQueueCfg,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("rabbitmq/rabbitmq.go - failed to declare retry queue - %w", err)
+		return nil, err
 	}
 
 	err = rabbitMqChan.QueueBind(
 		retryQueue.Name,
-		"notifications-key",
-		"retry-notifications-exchange",
+		routingKey,
+		retryNotExchange,
 		false,
 		nil,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("rabbitmq/rabbitmq.go - failed to bind - %w", err)
+		return nil, err
 	}
 
-	consumerConfig := rabbitmq.NewConsumerConfig("notifications-queue")
+	consumerConfig := rabbitmq.NewConsumerConfig(notQueue)
 
-	publisher := rabbitmq.NewPublisher(rabbitMqChan, "notifications-exchange")
+	publisher := rabbitmq.NewPublisher(rabbitMqChan, notExchange)
 	consumer := rabbitmq.NewConsumer(rabbitMqChan, consumerConfig)
 
 	return &RabbitMq{
 		publisher: publisher,
 		consumer:  consumer,
 		ch:        rabbitMqChan,
+		cfg:       cfg,
 	}, nil
 }
 
@@ -136,7 +148,7 @@ func (r *RabbitMq) Publish(routingKey string, message []byte, contentType string
 
 	err := r.publisher.Publish(message, routingKey, contentType, publishinOptions)
 	if err != nil {
-		return fmt.Errorf("rabbitmq/publisher.go - failed to publish message - %w", err)
+		return err
 	}
 	return nil
 }
@@ -144,7 +156,7 @@ func (r *RabbitMq) Publish(routingKey string, message []byte, contentType string
 func (r *RabbitMq) Consume(msgChan chan []byte) error {
 	err := r.consumer.Consume(msgChan)
 	if err != nil {
-		return fmt.Errorf("rabbitmq/consumer.go - failed to consume message - %w", err)
+		return err
 	}
 	return nil
 }

@@ -18,11 +18,12 @@ rabbitmq:
   password: "guest"
   retries: 3
   pause: 1s
-  exchange: "notify-exchange"
-  queue: "notify-queue"
-  retry_queue: "notify-retry"
-  dlq: "notify-dlq"
+  not_exchange: "notify-exchange"
+  retry_not_exchange: "notify-exchange-retry"
+  not_queue: "notify-queue"
+  not_queue_retry: "notify-retry"
   routing_key: "notify"
+  ttl: 60000
 
 retry:
   attempts: 3

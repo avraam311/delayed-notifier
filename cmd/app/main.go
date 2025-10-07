@@ -30,24 +30,24 @@ func main() {
 	}
 
 	val := validator.New()
-	rMQ, err := rabbitmq.New()
+	rMQ, err := rabbitmq.New(cfg)
 	if err != nil {
 		zlog.Logger.Panic().Err(err).Msg("failed to initialize rabbitMQ")
 	}
 
 	opts := &dbpg.Options{
-		MaxOpenConns:    cfg.Cfg.GetInt("max_open_conns"),
-		MaxIdleConns:    cfg.Cfg.GetInt("max_idle_conns"),
-		ConnMaxLifetime: time.Duration(cfg.Cfg.GetInt("conn_max_lifetime")),
+		MaxOpenConns:    cfg.Cfg.GetInt("database.max_open_conns"),
+		MaxIdleConns:    cfg.Cfg.GetInt("database.max_idle_conns"),
+		ConnMaxLifetime: time.Duration(cfg.Cfg.GetInt("database.conn_max_lifetime")),
 	}
 
-	slaveDNSs := make([]string, 0, len(cfg.Cfg.GetString("slaves")))
+	slaveDNSs := make([]string, 0, len(cfg.Cfg.GetSlice("database.slaves")))
 
-	for _, s := range cfg.Cfg.GetSlice("slaves") {
+	for _, s := range cfg.Cfg.GetSlice("database.slaves") {
 		slaveDNSs = append(slaveDNSs, s.DSN())
 	}
 
-	db, err := dbpg.New(cfg.Cfg.GetString("master"), slaveDNSs, opts)
+	db, err := dbpg.New(cfg.Cfg.GetString("database.master"), slaveDNSs, opts)
 	if err != nil {
 		zlog.Logger.Panic().Err(err).Msg("failed to initialize db")
 	}
@@ -57,7 +57,7 @@ func main() {
 	notHandler := handlers.NewHandler(s, val)
 
 	r := server.NewRouter(notHandler)
-	srv := server.NewServer(cfg.Cfg.GetString("port"), r)
+	srv := server.NewServer(cfg.Cfg.GetString("server.port"), r)
 	go func() {
 		if err := srv.ListenAndServe(); err != nil {
 			zlog.Logger.Panic().Err(err).Msg("failed to run server")

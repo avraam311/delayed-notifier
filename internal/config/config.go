@@ -23,15 +23,14 @@ type Redis struct {
 
 type SMTP struct {
 	Host     string
-	Port     int
+	Port     string
 	User     string
 	Password string
 	From     string
 }
 
 type TG struct {
-	Token  string
-	ChatID int
+	Token string
 }
 
 type Env struct {
@@ -73,24 +72,15 @@ func MustLoad() (*Config, error) {
 		Password: os.Getenv("REDIS_PASSWORD"),
 		Number:   redis_number,
 	}
-	smtp_port, err := strconv.Atoi(os.Getenv("SMTP_PORT"))
-	if err != nil {
-		return nil, err
-	}
 	smtp := SMTP{
 		Host:     os.Getenv("SMTP_HOST"),
-		Port:     smtp_port,
+		Port:     os.Getenv("SMTP_PORT"),
 		User:     os.Getenv("SMTP_USER"),
 		Password: os.Getenv("SMTP_PASSWORD"),
 		From:     os.Getenv("SMRT_From"),
 	}
-	tg_chat_id, err := strconv.Atoi(os.Getenv("TELEGRAM_CHAT_ID"))
-	if err != nil {
-		return nil, err
-	}
 	tg := TG{
-		Token:  os.Getenv("TELEGRAM_TOKEN"),
-		ChatID: tg_chat_id,
+		Token: os.Getenv("TELEGRAM_TOKEN"),
 	}
 	env := Env{
 		DB:    &db,
