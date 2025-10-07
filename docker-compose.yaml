@@ -1,11 +1,25 @@
 services:
-  worker:
+  app:
     build:
       context: .
       dockerfile: ./cmd/app/Dockerfile
+    container_name: app
+    ports:
+      - "3000:3000"
+    depends_on:
+      - rabbitmq
+    env_file:
+      - .env
+    networks:
+      - app-network
+
+  worker:
+    build:
+      context: .
+      dockerfile: ./cmd/worker/Dockerfile
     container_name: worker
     ports:
-      - "3001"
+      - "3001:3001"
     depends_on:
       - rabbitmq
     env_file:
