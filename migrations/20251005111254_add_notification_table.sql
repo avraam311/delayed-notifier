@@ -7,7 +7,7 @@ CREATE TABLE IF NOT EXISTS notification (
     date_time TIMESTAMP NOT NULL,
     status VARCHAR(30),
     mail TEXT NOT NULL,
-    tg_id INTEGER
+    tg_id VARCHAR(15)
 );
 
 -- +goose StatementEnd

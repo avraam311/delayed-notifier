@@ -1,12 +1,8 @@
 server:
   port: ":8080"
+  gin_mode: ""
 
-database:
-  master:
-    ssl_mode: "disable"
-
-  slaves: []
-
+db:
   max_open_conns: 10
   max_idle_conns: 5
   conn_max_lifetime: 30m
@@ -17,7 +13,6 @@ rabbitmq:
   user: "guest"
   password: "guest"
   retries: 3
-  pause: 1s
   not_exchange: "notify-exchange"
   retry_not_exchange: "notify-exchange-retry"
   not_queue: "notify-queue"
@@ -27,7 +22,7 @@ rabbitmq:
 
 retry:
   attempts: 3
-  delay: 50ms
+  delay: 500ms
   backoff: 2.0
 
 workers:

@@ -15,8 +15,8 @@ type Mail struct {
 	password string
 }
 
-func NewMail(host, port, from, password string) *Mail {
-	auth := smtp.PlainAuth("", from, password, host)
+func NewMail(host, port, user, from, password string) *Mail {
+	auth := smtp.PlainAuth("", user, password, host)
 	return &Mail{
 		host:     host,
 		port:     port,
@@ -30,7 +30,7 @@ func (m *Mail) SendMessage(msg []byte) error {
 	not := &domain.Notification{}
 	json.Unmarshal(msg, not)
 	to := []string{not.Mail}
-	msgToSend := []byte("Subject: Hello from Go\r\n" +
+	msgToSend := []byte("Subject: Notifying about your to do\r\n" +
 		"\r\n" +
 		not.Message + "\r\n")
 

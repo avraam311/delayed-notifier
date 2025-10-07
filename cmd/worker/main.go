@@ -5,12 +5,18 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/avraam311/delayed-notifier/internal/config"
 	"github.com/avraam311/delayed-notifier/internal/rabbitmq"
 	"github.com/avraam311/delayed-notifier/internal/sender"
 	"github.com/avraam311/delayed-notifier/internal/worker"
 
+	"github.com/wb-go/wbf/config"
 	"github.com/wb-go/wbf/zlog"
+)
+
+const (
+	configFilePath = "./config/local.yaml"
+	envFilePath    = "./.env"
+	envPrefix      = ""
 )
 
 func main() {
@@ -18,7 +24,8 @@ func main() {
 	defer cancel()
 
 	zlog.Init()
-	cfg, err := config.MustLoad()
+	cfg := config.New()
+	err := cfg.Load(configFilePath, envFilePath, envPrefix)
 	if err != nil {
 		zlog.Logger.Panic().Err(err).Msg("failed to initialize config")
 	}
@@ -28,18 +35,21 @@ func main() {
 		zlog.Logger.Panic().Err(err).Msg("failed to initialize rabbitMQ")
 	}
 
-	tgBot, err := sender.NewBot(cfg.Env.TG.Token)
+	tgBot, err := sender.NewBot(cfg.GetString("TELEGRAM_TOKEN"))
 	if err != nil {
 		zlog.Logger.Panic().Err(err).Msg("failed to initialize tg bot")
 	}
-	mail := sender.NewMail(cfg.Env.DB.Host,
-		cfg.Env.SMTP.Port,
-		cfg.Env.SMTP.From,
-		cfg.Env.SMTP.Password,
+
+	mail := sender.NewMail(cfg.GetString("SMTP_HOST"),
+		cfg.GetString("SMTP_PORT"),
+		cfg.GetString("SMTP_USER"),
+		cfg.GetString("SMTP_FROM"),
+		cfg.GetString("SMTP_PASSWORD"),
 	)
 
-	work := worker.New(rMQ, cfg.Cfg.GetInt("workers.count"), tgBot, mail)
-	go work.Run()
+	work := worker.New(rMQ, cfg.GetInt("workers.count"), tgBot, mail, cfg)
+	go work.Run(ctx)
+	zlog.Logger.Info().Msg("worker is running")
 
 	<-ctx.Done()
 

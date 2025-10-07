@@ -7,8 +7,8 @@ import (
 	"github.com/avraam311/delayed-notifier/internal/middlewares"
 )
 
-func NewRouter(handler *handlers.HandlerNotification) *ginext.Engine {
-	e := ginext.New()
+func NewRouter(handler *handlers.HandlerNotification, ginMode string) *ginext.Engine {
+	e := ginext.New(ginMode)
 
 	e.Use(middlewares.CORSMiddleware())
 	e.Use(ginext.Logger())

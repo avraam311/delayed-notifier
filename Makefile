@@ -8,6 +8,9 @@ lint:
 	golangci-lint run ./...
 
 up:
+	docker compose up
+
+buildup:
 	docker compose up --build
 
 down:

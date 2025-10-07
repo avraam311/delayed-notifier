@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/avraam311/delayed-notifier/internal/config"
 	amqp "github.com/rabbitmq/amqp091-go"
+	"github.com/wb-go/wbf/config"
 	"github.com/wb-go/wbf/rabbitmq"
 )
 
@@ -17,11 +17,11 @@ type RabbitMq struct {
 }
 
 func New(cfg *config.Config) (*RabbitMq, error) {
-	url := fmt.Sprintf("amqp://%s:%s@%s:%s/", cfg.Cfg.GetString("rabbitmq.user"),
-		cfg.Cfg.GetString("rabbitmq.password"),
-		cfg.Cfg.GetString("rabbitmq.host"),
-		cfg.Cfg.GetString("rabbitmq.port"))
-	conn, err := rabbitmq.Connect(url, cfg.Cfg.GetInt("rabbitmq.retries"), time.Second*10)
+	url := fmt.Sprintf("amqp://%s:%s@%s:%s/", cfg.GetString("rabbitmq.user"),
+		cfg.GetString("rabbitmq.password"),
+		cfg.GetString("rabbitmq.host"),
+		cfg.GetString("rabbitmq.port"))
+	conn, err := rabbitmq.Connect(url, cfg.GetInt("rabbitmq.retries"), time.Second*10)
 	if err != nil {
 		return nil, err
 	}
@@ -31,7 +31,7 @@ func New(cfg *config.Config) (*RabbitMq, error) {
 		return nil, err
 	}
 
-	notExchange := cfg.Cfg.GetString("rabbitmq.not_exchange")
+	notExchange := cfg.GetString("rabbitmq.not_exchange")
 	mainExchange := rabbitmq.NewExchange(
 		notExchange,
 		"x-delayed-message",
@@ -47,7 +47,7 @@ func New(cfg *config.Config) (*RabbitMq, error) {
 		return nil, err
 	}
 
-	retryNotExchange := cfg.Cfg.GetString("rabbitmq.not_exchange_retry")
+	retryNotExchange := cfg.GetString("rabbitmq.retry_not_exchange")
 	retryExchange := rabbitmq.NewExchange(
 		retryNotExchange,
 		"direct",
@@ -71,7 +71,7 @@ func New(cfg *config.Config) (*RabbitMq, error) {
 		NoWait:     false,
 		Args:       args,
 	}
-	notQueue := cfg.Cfg.GetString("rabbitmq.not_queue")
+	notQueue := cfg.GetString("rabbitmq.not_queue")
 	mainQueue, err := mainQueueManager.DeclareQueue(
 		notQueue,
 		queueCfg,
@@ -80,7 +80,7 @@ func New(cfg *config.Config) (*RabbitMq, error) {
 		return nil, err
 	}
 
-	routingKey := cfg.Cfg.GetString("rabbitmq.routing_key")
+	routingKey := cfg.GetString("rabbitmq.routing_key")
 	err = rabbitMqChan.QueueBind(
 		mainQueue.Name,
 		routingKey,
@@ -93,7 +93,7 @@ func New(cfg *config.Config) (*RabbitMq, error) {
 	}
 
 	retryArgs := amqp.Table{
-		"x-message-ttl":          int32(cfg.Cfg.GetInt("rabbitmq.ttl")),
+		"x-message-ttl":          int32(cfg.GetInt("rabbitmq.ttl")),
 		"x-dead-letter-exchange": notExchange,
 	}
 
@@ -105,7 +105,7 @@ func New(cfg *config.Config) (*RabbitMq, error) {
 		NoWait:     false,
 		Args:       retryArgs,
 	}
-	notQueueRetry := cfg.Cfg.GetString("rabbitmq.not_queue_retry")
+	notQueueRetry := cfg.GetString("rabbitmq.not_queue_retry")
 	retryQueue, err := retryQueueManager.DeclareQueue(
 		notQueueRetry,
 		retryQueueCfg,

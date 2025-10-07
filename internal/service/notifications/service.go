@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/avraam311/delayed-notifier/internal/models/domain"
+	"github.com/wb-go/wbf/config"
 )
 
 type repositoryNotification interface {
@@ -22,12 +23,14 @@ type rabbitMQ interface {
 type ServiceNotification struct {
 	repo     repositoryNotification
 	rabbitMQ rabbitMQ
+	cfg      *config.Config
 }
 
-func NewService(repo repositoryNotification, rMQ rabbitMQ) *ServiceNotification {
+func NewService(repo repositoryNotification, rMQ rabbitMQ, cfg *config.Config) *ServiceNotification {
 	return &ServiceNotification{
 		repo:     repo,
 		rabbitMQ: rMQ,
+		cfg:      cfg,
 	}
 }
 
@@ -37,13 +40,16 @@ func (s *ServiceNotification) CreateNotification(ctx context.Context, not *domai
 		return 0, err
 	}
 
-	delay := time.Until(not.DateTime)
 	msg, err := json.Marshal(not)
 	if err != nil {
-		return 0, fmt.Errorf("notification/service.go - %w", err)
+		return 0, fmt.Errorf("notification/service.go - failed to marshal notification into json - %w", err)
 	}
 
-	s.rabbitMQ.Publish("notifications-key", msg, "application/json", delay)
+	delay := time.Until(not.DateTime)
+	err = s.rabbitMQ.Publish(s.cfg.GetString("rabbitmq.routing_key"), msg, "application/json", delay)
+	if err != nil {
+		return 0, fmt.Errorf("notification/service.go - failed to publish message into rabbitmq %w", err)
+	}
 
 	return id, nil
 }

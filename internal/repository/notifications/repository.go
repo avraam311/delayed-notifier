@@ -15,6 +15,10 @@ var (
 	ErrNotificationNotFound = errors.New("notification not found")
 )
 
+const (
+	notStatus = "in queue"
+)
+
 type repositoryNotification struct {
 	db *dbpg.DB
 }
@@ -28,14 +32,14 @@ func NewRepository(db *dbpg.DB) *repositoryNotification {
 func (r *repositoryNotification) CreateNotification(ctx context.Context, not *domain.Notification) (int, error) {
 	query := `
 		INSERT INTO notification (
-			message, date_time, tg_id, mail
-		) VALUES ($1, $2, $3, $4)
+			message, date_time, tg_id, mail, status
+		) VALUES ($1, $2, $3, $4, $5)
 		RETURNING id;
 	`
 
 	var id int
 	err := r.db.QueryRowContext(
-		ctx, query, not.Message, not.DateTime, not.TgID, not.Mail,
+		ctx, query, not.Message, not.DateTime, not.TgID, not.Mail, notStatus,
 	).Scan(&id)
 	if err != nil {
 		return 0, fmt.Errorf("notifications/repository.go - %w", err)

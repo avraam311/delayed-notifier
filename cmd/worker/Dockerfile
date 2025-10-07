@@ -6,11 +6,12 @@ COPY . .
 
 RUN go mod download
 
-RUN go build -o worker cmd/worker/main.go
+RUN go build -o worker ./cmd/worker/main.go
 
 FROM alpine AS runner
 
-COPY --from=build_base /worker/worker .
-COPY config config
+COPY --from=build_base ./worker/worker .
+COPY ./config ./config
+COPY ./.env . 
 
-CMD ["worker"]
+CMD ["./worker"]

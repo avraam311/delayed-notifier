@@ -2,6 +2,7 @@ package sender
 
 import (
 	"encoding/json"
+	"strconv"
 
 	"github.com/avraam311/delayed-notifier/internal/models/domain"
 
@@ -26,12 +27,16 @@ func (tb *TelegramBot) SendMessage(msg []byte) error {
 	var not *domain.Notification
 	json.Unmarshal(msg, &not)
 
-	chatID := int64(not.TgID)
+	chatIDINT, err := strconv.Atoi(not.TgID)
+	if err != nil {
+		return err
+	}
+	chatID := int64(chatIDINT)
 	text := not.Message
 
 	msgToSend := tg.NewMessage(chatID, text)
 
-	_, err := tb.bot.Send(msgToSend)
+	_, err = tb.bot.Send(msgToSend)
 	if err != nil {
 		return err
 	}
