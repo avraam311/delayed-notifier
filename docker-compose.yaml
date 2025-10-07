@@ -7,7 +7,12 @@ services:
     ports:
       - "3000:3000"
     depends_on:
-      - rabbitmq
+      db:
+        condition: service_healthy
+      migrator:
+        condition: service_completed_successfully
+      rabbitmq:
+        condition: service_healthy
     env_file:
       - .env
     networks:
@@ -21,7 +26,12 @@ services:
     ports:
       - "3001:3001"
     depends_on:
-      - rabbitmq
+      db:
+        condition: service_healthy
+      migrator:
+        condition: service_completed_successfully
+      rabbitmq:
+        condition: service_healthy
     env_file:
       - .env
     networks:
@@ -94,9 +104,11 @@ services:
       - app-network
 
 volumes:
+  postgres_data:
   rabbitmq-lib:
+    driver: local
   rabbitmq-log:
-
+    driver: local
 
 networks:
   app-network:
