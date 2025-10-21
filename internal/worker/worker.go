@@ -2,15 +2,22 @@ package worker
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strconv"
 	"sync"
 
+	"github.com/avraam311/delayed-notifier/internal/models/domain"
 	"github.com/avraam311/delayed-notifier/internal/rabbitmq"
 
 	"github.com/wb-go/wbf/config"
 	"github.com/wb-go/wbf/retry"
 	"github.com/wb-go/wbf/zlog"
+)
+
+const (
+	notSuccessStatus = "delivered"
+	notFailStatus = "failed_to_delivered"
 )
 
 type tgBotI interface {
@@ -21,12 +28,17 @@ type mailI interface {
 	SendMessage(msg []byte) error
 }
 
+type Repository interface {
+	ChangeNotificationStatus(context.Context, int, string) error
+}
+
 type Worker struct {
 	RMQ          *rabbitmq.RabbitMq
 	WorkersCount int
 	TgBot        tgBotI
 	Mail         mailI
 	cfg          *config.Config
+	repo         Repository
 }
 
 func New(rMQ *rabbitmq.RabbitMq, workersCount int, tgBot tgBotI, mail mailI, cfg *config.Config) *Worker {
@@ -65,17 +77,31 @@ func (w *Worker) Run(ctx context.Context) {
 				case <-ctx.Done():
 					return
 				case msg := <-readerCh:
+					not := domain.NotificationWithID{}
+					json.Unmarshal(msg, &not)
+					notID := not.ID
+					defineStatus := 0
+
 					err := retry.Do(func() error {
 						return w.sendToTg(msg)
 					}, retryStrategy)
 					if err != nil {
 						zlog.Logger.Warn().Err(err).Str("worker_id", strconv.Itoa(id)).Msg("worker/workeg.go - failed to send to tg")
+					} else {
+						defineStatus++
 					}
 					err = retry.Do(func() error {
 						return w.sendToMail(msg)
 					}, retryStrategy)
 					if err != nil {
 						zlog.Logger.Warn().Err(err).Str("worker_id", strconv.Itoa(id)).Msg("worker/workeg.go - failed to send to mail")
+					} else {
+						defineStatus++
+					}
+					if defineStatus == 0 {
+						w.repo.ChangeNotificationStatus(ctx, notID, notSuccessStatus)
+					} else {
+						w.repo.ChangeNotificationStatus(ctx, notID, notFailStatus)
 					}
 				}
 			}

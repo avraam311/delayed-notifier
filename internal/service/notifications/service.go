@@ -40,12 +40,20 @@ func (s *ServiceNotification) CreateNotification(ctx context.Context, not *domai
 		return 0, err
 	}
 
-	msg, err := json.Marshal(not)
+	notToPublish := &domain.NotificationWithID{
+		ID:       id,
+		Message:  not.Message,
+		DateTime: not.DateTime,
+		Mail:     not.Mail,
+		TgID:     not.TgID,
+	}
+
+	msg, err := json.Marshal(notToPublish)
 	if err != nil {
 		return 0, fmt.Errorf("notification/service.go - failed to marshal notification into json - %w", err)
 	}
 
-	delay := time.Until(not.DateTime)
+	delay := time.Until(notToPublish.DateTime)
 	err = s.rabbitMQ.Publish(s.cfg.GetString("rabbitmq.routing_key"), msg, "application/json", delay)
 	if err != nil {
 		return 0, fmt.Errorf("notification/service.go - failed to publish message into rabbitmq %w", err)

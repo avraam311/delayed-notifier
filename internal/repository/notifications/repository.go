@@ -91,3 +91,25 @@ func (r *repositoryNotification) DeleteNotification(ctx context.Context, id int)
 
 	return nil
 }
+
+func (r *repositoryNotification) ChangeNotificationStatus(ctx context.Context, id int, status string) error {
+	query := `
+		UPDATE notification
+		SET status = $2
+		WHERE id =  $1
+	`
+
+	res, err := r.db.ExecContext(
+		ctx, query, id, status,
+	)
+	if err != nil {
+		return fmt.Errorf("notifications/repository.go - %w", err)
+	}
+
+	affectedRows, _ := res.RowsAffected()
+	if affectedRows == 0 {
+		return ErrNotificationNotFound
+	}
+
+	return nil
+}
