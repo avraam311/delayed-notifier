@@ -28,13 +28,16 @@ func NewMail(host, port, user, from, password string) *Mail {
 
 func (m *Mail) SendMessage(msg []byte) error {
 	not := &domain.Notification{}
-	json.Unmarshal(msg, not)
+	err := json.Unmarshal(msg, not)
+	if err != nil {
+		return err
+	}
 	to := []string{not.Mail}
 	msgToSend := []byte("Subject: Notifying about your to do\r\n" +
 		"\r\n" +
 		not.Message + "\r\n")
 
-	err := smtp.SendMail(m.host+":"+m.port, m.auth, m.from, to, msgToSend)
+	err = smtp.SendMail(m.host+":"+m.port, m.auth, m.from, to, msgToSend)
 	if err != nil {
 		return err
 	}

@@ -16,8 +16,9 @@ import (
 )
 
 const (
-	notSuccessStatus = "delivered"
-	notFailStatus = "failed_to_delivered"
+	notSuccessStatus  = "delivered"
+	notFailStatus     = "failed_to_deliver"
+	notCanceledStatus = "canceled"
 )
 
 type tgBotI interface {
@@ -30,6 +31,7 @@ type mailI interface {
 
 type Repository interface {
 	ChangeNotificationStatus(context.Context, int, string) error
+	CheckIfToDelete(context.Context, int) (int, error)
 }
 
 type Worker struct {
@@ -41,13 +43,14 @@ type Worker struct {
 	repo         Repository
 }
 
-func New(rMQ *rabbitmq.RabbitMq, workersCount int, tgBot tgBotI, mail mailI, cfg *config.Config) *Worker {
+func New(rMQ *rabbitmq.RabbitMq, workersCount int, tgBot tgBotI, mail mailI, cfg *config.Config, repo Repository) *Worker {
 	return &Worker{
 		RMQ:          rMQ,
 		WorkersCount: workersCount,
 		TgBot:        tgBot,
 		Mail:         mail,
 		cfg:          cfg,
+		repo:         repo,
 	}
 }
 
@@ -78,16 +81,30 @@ func (w *Worker) Run(ctx context.Context) {
 					return
 				case msg := <-readerCh:
 					not := domain.NotificationWithID{}
-					json.Unmarshal(msg, &not)
+					err := json.Unmarshal(msg, &not)
+					if err != nil {
+						zlog.Logger.Warn().Err(err).Msg("failed to unmarshal message into struct")
+						continue
+					}
 					notID := not.ID
-					defineStatus := 0
+					delete, err := w.repo.CheckIfToDelete(ctx, notID)
+					if err == nil && delete != 0 {
+						err := w.repo.ChangeNotificationStatus(ctx, notID, notCanceledStatus)
+						if err != nil {
+							zlog.Logger.Warn().Err(err).Msg("failedt to change notification status")
+						}
+						continue
+					} else if err != nil {
+						zlog.Logger.Warn().Err(err).Msg("failed to check if to delete")
+						continue
+					}
 
-					err := retry.Do(func() error {
+					defineStatus := 0
+					err = retry.Do(func() error {
 						return w.sendToTg(msg)
 					}, retryStrategy)
 					if err != nil {
 						zlog.Logger.Warn().Err(err).Str("worker_id", strconv.Itoa(id)).Msg("worker/workeg.go - failed to send to tg")
-					} else {
 						defineStatus++
 					}
 					err = retry.Do(func() error {
@@ -95,13 +112,18 @@ func (w *Worker) Run(ctx context.Context) {
 					}, retryStrategy)
 					if err != nil {
 						zlog.Logger.Warn().Err(err).Str("worker_id", strconv.Itoa(id)).Msg("worker/workeg.go - failed to send to mail")
-					} else {
 						defineStatus++
 					}
-					if defineStatus == 0 {
-						w.repo.ChangeNotificationStatus(ctx, notID, notSuccessStatus)
+					if defineStatus != 2 {
+						err = w.repo.ChangeNotificationStatus(ctx, notID, notSuccessStatus)
+						if err != nil {
+							zlog.Logger.Warn().Err(err).Msg("failedt to change notification status")
+						}
 					} else {
-						w.repo.ChangeNotificationStatus(ctx, notID, notFailStatus)
+						err = w.repo.ChangeNotificationStatus(ctx, notID, notFailStatus)
+						if err != nil {
+							zlog.Logger.Warn().Err(err).Msg("failedt to change notification status")
+						}
 					}
 				}
 			}

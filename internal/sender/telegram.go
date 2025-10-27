@@ -25,8 +25,10 @@ func NewBot(botToken string) (*TelegramBot, error) {
 
 func (tb *TelegramBot) SendMessage(msg []byte) error {
 	var not *domain.Notification
-	json.Unmarshal(msg, &not)
-
+	err := json.Unmarshal(msg, &not)
+	if err != nil {
+		return err
+	}
 	chatIDINT, err := strconv.Atoi(not.TgID)
 	if err != nil {
 		return err

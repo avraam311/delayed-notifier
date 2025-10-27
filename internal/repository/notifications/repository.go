@@ -72,24 +72,44 @@ func (r *repositoryNotification) GetNotificationStatus(ctx context.Context, id i
 
 func (r *repositoryNotification) DeleteNotification(ctx context.Context, id int) error {
 	query := `
-		DELETE
-		FROM notifications
-		WHERE id = $1
+		INSERT INTO delete (delete_id)
+		SELECT $1
+		WHERE EXISTS (
+			SELECT 1 FROM notification WHERE id = $1
+		)
+		ON CONFLICT (delete_id) DO NOTHING;
 	`
 
-	res, err := r.db.ExecContext(
+	_, err := r.db.ExecContext(
 		ctx, query, id,
 	)
 	if err != nil {
 		return fmt.Errorf("notifications/repository.go - %w", err)
 	}
 
-	affectedRows, _ := res.RowsAffected()
-	if affectedRows == 0 {
-		return ErrNotificationNotFound
+	return nil
+}
+
+func (r *repositoryNotification) CheckIfToDelete(ctx context.Context, deleteID int) (int, error) {
+	query := `
+		SELECT id
+		FROM delete
+		WHERE delete_id = $1
+	`
+
+	var id int
+	err := r.db.QueryRowContext(
+		ctx, query, deleteID,
+	).Scan(&id)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return 0, nil
+		}
+
+		return 0, fmt.Errorf("notifications/repository.go - %w", err)
 	}
 
-	return nil
+	return id, nil
 }
 
 func (r *repositoryNotification) ChangeNotificationStatus(ctx context.Context, id int, status string) error {
